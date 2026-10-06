@@ -100,8 +100,9 @@ function cekNik(nik) {
 }
 
 async function masuk() {
-  const { error } = await db.auth.signInWithPassword({ email: $('email').value.trim().toLowerCase() + '@petugas.rt', password: $('pass').value });
-  if (error) return show($('loginMsg'), 'Login gagal: email atau password salah.', 'err');
+  const id = $('email').value.trim().toLowerCase().split('@')[0];
+  const { error } = await db.auth.signInWithPassword({ email: id + '@petugas.rt', password: $('pass').value });
+  if (error) return show($('loginMsg'), 'Login gagal: ' + esc(error.message), 'err');
   mulai();
 }
 
