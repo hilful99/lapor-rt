@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lapor Tamu RT 1x24 Jam</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;margin:0;background:#f3f5f8;color:#1b2430}
+  header{background:#1f3864;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+  header h1{font-size:18px;margin:0}
+  main{max-width:760px;margin:0 auto;padding:16px}
+  .card{background:#fff;border-radius:10px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px #0002}
+  label{display:block;font-size:14px;margin:10px 0 4px;font-weight:600}
+  input,select,button{font:inherit;width:100%;padding:10px;border:1px solid #c5ccd6;border-radius:8px}
+  button{background:#1f5fa8;color:#fff;border:0;cursor:pointer;margin-top:14px;font-weight:600}
+  button.small{width:auto;margin:0;padding:6px 10px;font-size:13px;background:#2e7d32}
+  button.ghost{width:auto;margin:0;background:#fff3;padding:6px 12px}
+  .chk{display:flex;gap:8px;align-items:center;margin-top:14px}
+  .chk input{width:auto}
+  .msg{padding:10px;border-radius:8px;margin-top:12px;font-size:14px}
+  .err{background:#fde8e8;color:#9b1c1c}.ok{background:#e6f4ea;color:#1e6b34}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #e3e7ee;vertical-align:top}
+  .wrap{overflow-x:auto}
+  .tag{padding:2px 8px;border-radius:99px;font-size:12px}
+  .Aktif{background:#fff3cd}.Selesai{background:#e6f4ea}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header><h1>Lapor Tamu RT 1x24 Jam</h1><button id="btnOut" class="ghost hidden">Keluar</button></header>
+<main>
+
+<!-- LOGIN -->
+<section id="viewLogin" class="card">
+  <h2>Login Petugas</h2>
+  <label>ID Akun</label><input id="email" autocomplete="username" autocapitalize="none" placeholder="contoh: 4ipul4">
+  <label>Password</label><input id="pass" type="password" autocomplete="current-password">
+  <button id="btnLogin">Masuk</button>
+  <div id="loginMsg"></div>
+</section>
+
+<!-- APLIKASI -->
+<section id="viewApp" class="hidden">
+  <div class="card">
+    <h2>Catat Tamu Baru</h2>
+    <label>NIK (16 digit, sesuai KTP yang diperlihatkan)</label>
+    <input id="nik" inputmode="numeric" maxlength="16" placeholder="16 digit angka">
+    <label>Nama Tamu</label><input id="nama">
+    <label>No. HP</label><input id="hp" inputmode="tel">
+    <label>Asal Daerah</label><input id="asal">
+    <label>Tujuan Kunjungan</label><input id="tujuan" placeholder="Keluarga, kerja, kontrak, dll">
+    <label>Tuan Rumah yang Dituju</label><select id="warga"></select>
+    <label>Penanggung Jawab</label><input id="pj" placeholder="Terisi otomatis dari tuan rumah, boleh diubah">
+    <div class="chk"><input type="checkbox" id="ktp"><label for="ktp" style="margin:0">KTP fisik sudah dicek dan dikembalikan</label></div>
+    <button id="btnSave">Simpan Laporan</button>
+    <div id="formMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Daftar Tamu Hari Ini</h2>
+    <div class="wrap"><table>
+      <thead><tr><th>No. Dokumen</th><th>Tamu</th><th>Dituju</th><th>Masuk</th><th>Status</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </div>
+</section>
+</main>
+
+<script>
+// ====== ISI DUA BARIS INI (Supabase > Project Settings > API) ======
+const SUPABASE_URL = 'https://yfmkedgilmbnrtfckgvc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Fwn89gdmjrJOAzgOlkH6Tw_evFLG39y';
+// ===================================================================
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = id => document.getElementById(id);
+let wargaList = [];
+
+const show = (el, msg, cls) => el.innerHTML = msg ? `<div class="msg ${cls}">${msg}</div>` : '';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const maskNik = n => n.slice(0,4) + '********' + n.slice(-4);
+const jam = t => new Date(t).toLocaleString('id-ID', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+
+// Validasi NIK: 16 digit, kode wilayah, tanggal lahir valid
+function cekNik(nik) {
+  if (!/^\d{16}$/.test(nik)) return 'NIK harus 16 digit angka.';
+  if (nik.startsWith('00') || nik.slice(2,4) === '00') return 'Kode wilayah NIK tidak valid.';
+  let hari = parseInt(nik.slice(6,8), 10);
+  const bulan = parseInt(nik.slice(8,10), 10);
+  const thn = parseInt(nik.slice(10,12), 10);
+  if (hari > 40) hari -= 40; // perempuan: tanggal + 40
+  const tahun = thn <= (new Date().getFullYear() % 100) ? 2000 + thn : 1900 + thn;
+  const d = new Date(tahun, bulan - 1, hari);
+  if (bulan < 1 || bulan > 12 || d.getDate() !== hari || d.getMonth() !== bulan - 1)
+    return 'Tanggal lahir di dalam NIK tidak valid.';
+  return null;
+}
+
+async function masuk() {
+  const { error } = await db.auth.signInWithPassword({ email: $('email').value.trim().toLowerCase() + '@petugas.rt', password: $('pass').value });
+  if (error) return show($('loginMsg'), 'Login gagal: email atau password salah.', 'err');
+  mulai();
+}
+
+async function mulai() {
+  const { data: { session } } = await db.auth.getSession();
+  $('viewLogin').classList.toggle('hidden', !!session);
+  $('viewApp').classList.toggle('hidden', !session);
+  $('btnOut').classList.toggle('hidden', !session);
+  if (!session) return;
+  const { data } = await db.from('warga').select('*').eq('aktif', true).order('nama');
+  wargaList = data || [];
+  $('warga').innerHTML = '<option value="">- pilih tuan rumah -</option>' +
+    wargaList.map(w => `<option value="${w.id}">${esc(w.nama)}${w.blok ? ' (' + esc(w.blok) + ')' : ''}</option>`).join('');
+  muatDaftar();
+}
+
+async function simpan() {
+  const msg = $('formMsg'); show(msg, '');
+  const nik = $('nik').value.trim();
+  const salah = cekNik(nik);
+  if (salah) return show(msg, salah, 'err');
+  if (!$('nama').value.trim()) return show(msg, 'Nama tamu wajib diisi.', 'err');
+  if (!$('warga').value) return show(msg, 'Pilih tuan rumah yang dituju.', 'err');
+  if (!$('pj').value.trim()) return show(msg, 'Penanggung jawab wajib diisi.', 'err');
+  if (!$('ktp').checked) return show(msg, 'Centang dulu: KTP fisik sudah dicek.', 'err');
+
+  const { data, error } = await db.from('tamu').insert({
+    nik, nama: $('nama').value.trim(), no_hp: $('hp').value.trim(), asal: $('asal').value.trim(),
+    tujuan: $('tujuan').value.trim(), warga_id: $('warga').value,
+    penanggung_jawab: $('pj').value.trim(), ktp_dicek: true
+  }).select().single();
+
+  if (error) {
+    if (error.code === '23505') return show(msg, 'NIK ini masih tercatat sebagai tamu aktif. Tandai keluar dulu jika sudah pulang.', 'err');
+    return show(msg, 'Gagal menyimpan: ' + esc(error.message), 'err');
+  }
+  show(msg, 'Tersimpan. Nomor dokumen: <b>' + esc(data.no_dokumen) + '</b>', 'ok');
+  ['nik','nama','hp','asal','tujuan','pj'].forEach(i => $(i).value = '');
+  $('warga').value = ''; $('ktp').checked = false;
+  muatDaftar();
+}
+
+async function muatDaftar() {
+  const awal = new Date(); awal.setHours(0,0,0,0);
+  const { data, error } = await db.from('tamu')
+    .select('*, warga(nama, blok)')
+    .or(`tgl_keluar.is.null,tgl_masuk.gte.${awal.toISOString()}`)
+    .order('tgl_masuk', { ascending: false });
+  if (error) return $('rows').innerHTML = `<tr><td colspan="6">Gagal memuat: ${esc(error.message)}</td></tr>`;
+  $('rows').innerHTML = data.length ? data.map(t => `
+    <tr>
+      <td>${esc(t.no_dokumen)}</td>
+      <td>${esc(t.nama)}<br><small>${maskNik(t.nik)}</small></td>
+      <td>${esc(t.warga?.nama)}<br><small>PJ: ${esc(t.penanggung_jawab)}</small></td>
+      <td>${jam(t.tgl_masuk)}</td>
+      <td><span class="tag ${t.status}">${t.status}</span></td>
+      <td>${t.tgl_keluar ? '' : `<button class="small" onclick="keluar('${t.id}')">Tandai keluar</button>`}</td>
+    </tr>`).join('') : '<tr><td colspan="6">Belum ada tamu.</td></tr>';
+}
+
+async function keluar(id) {
+  if (!confirm('Tandai tamu ini sudah keluar?')) return;
+  await db.from('tamu').update({ tgl_keluar: new Date().toISOString(), status: 'Selesai' }).eq('id', id);
+  muatDaftar();
+}
+
+$('btnLogin').onclick = masuk;
+$('btnSave').onclick = simpan;
+$('btnOut').onclick = async () => { await db.auth.signOut(); mulai(); };
+$('warga').onchange = () => {
+  const w = wargaList.find(x => x.id === $('warga').value);
+  if (w && !$('pj').value) $('pj').value = w.nama;
+};
+mulai();
+</script>
+</body>
+</html>
