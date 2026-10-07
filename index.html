@@ -46,7 +46,7 @@ button.ghost{width:auto;margin:0;background:#ffffff26;padding:6px 12px;font-size
 .tamu small{color:var(--mut)}
 .tag{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700}
 .Menunggu{background:var(--warnbg);color:var(--warn)}.Terkonfirmasi{background:var(--okbg);color:var(--ok)}.Ditolak,.Lewat{background:var(--erbg);color:var(--er)}.Selesai{background:var(--line);color:var(--mut)}
-button.small.no{background:#b3261e}.act{display:flex;gap:8px;flex-wrap:wrap}
+button.small.no{background:#b3261e}button.small.alt{background:#5b6b82}.act{display:flex;gap:8px;flex-wrap:wrap}
 .kosong{text-align:center;color:var(--mut);padding:30px 10px}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
 nav button{margin:0;background:none;color:var(--mut);border-radius:0;padding:14px 8px;flex:1}
@@ -74,8 +74,11 @@ nav button.on{color:var(--pri);box-shadow:inset 0 3px 0 var(--pri)}
       <h2>Catat Tamu Baru</h2>
       <p class="mut">Cocokkan nomor dengan KTP fisik tamu, lalu kembalikan KTP.</p>
       <h3>1 · Identitas tamu</h3>
-      <div class="row"><label for="nik">NIK</label><span id="nikCount">0/16</span></div>
-      <input id="nik" inputmode="numeric" maxlength="16" placeholder="16 digit angka">
+      <label for="jenis">Jenis Identitas</label>
+      <select id="jenis"><option value="KTP">KTP</option><option value="Dokumen lain">Dokumen lain (SIM / KK / Paspor)</option><option value="Tanpa identitas">Tanpa identitas (dijamin tuan rumah)</option></select>
+      <div id="boxNik"><div class="row"><label for="nik">NIK</label><span id="nikCount">0/16</span></div>
+      <input id="nik" inputmode="numeric" maxlength="16" placeholder="16 digit angka"></div>
+      <div id="boxNoId" class="hidden"><label for="noIdentitas">Nomor Dokumen</label><input id="noIdentitas" autocomplete="off"></div>
       <label for="nama">Nama Tamu</label><input id="nama" autocomplete="off">
       <label for="hp">No. HP</label><input id="hp" type="tel" inputmode="tel" placeholder="08xxxxxxxxxx (boleh kosong)">
       <label for="asal">Asal Daerah</label><input id="asal" autocomplete="off">
@@ -84,7 +87,7 @@ nav button.on{color:var(--pri);box-shadow:inset 0 3px 0 var(--pri)}
       <label for="warga">Tuan Rumah yang Dituju</label><select id="warga"></select>
       <label for="pj">Penanggung Jawab</label><input id="pj" placeholder="Terisi otomatis dari tuan rumah, boleh diubah">
       <h3>3 · Verifikasi</h3>
-      <div class="chk"><input type="checkbox" id="ktp"><label for="ktp">KTP fisik sudah dicek dan dikembalikan</label></div>
+      <div class="chk"><input type="checkbox" id="ktp"><label for="ktp" id="lblKtp">KTP fisik sudah dicek dan dikembalikan</label></div>
       <button id="btnSave" disabled>Simpan Laporan</button>
       <div id="formMsg"></div>
     </div>
@@ -103,13 +106,19 @@ nav button.on{color:var(--pri);box-shadow:inset 0 3px 0 var(--pri)}
       <div><b id="sSelesai">0</b><span>Terkonfirmasi</span></div>
       <div><b id="sTotal">0</b><span>Lewat 24 jam</span></div>
     </div>
+    <div class="row" style="margin-bottom:10px"><input id="tglDari" type="date" title="Dari tanggal"><input id="tglSampai" type="date" title="Sampai tanggal"></div>
+    <p class="mut" style="margin:-4px 0 10px">Tanggal kosong = hari ini dan tamu yang masih aktif.</p>
     <select id="fStatus" style="margin-bottom:10px"><option value="">Semua status</option><option>Menunggu</option><option>Terkonfirmasi</option><option>Ditolak</option><option>Selesai</option><option value="Lewat">Lewat 24 jam</option></select>
     <input id="cari" type="search" placeholder="Cari nama atau nomor dokumen">
     <div id="daftar"></div>
   </div>
+  <div id="tabLog" class="hidden">
+    <h2>Log Aktivitas</h2><p class="mut">200 catatan terakhir.</p>
+    <div id="logList"></div>
+  </div>
 </section>
 </main>
-<nav id="tabbar" class="hidden"><button id="tbCatat" class="on">📝 Catat Tamu</button><button id="tbDaftar">📋 Daftar Tamu</button></nav>
+<nav id="tabbar" class="hidden"><button id="tbCatat" class="on">📝 Catat Tamu</button><button id="tbDaftar">📋 Daftar Tamu</button><button id="tbLog" class="hidden">🔒 Log</button></nav>
 <div id="toast" class="toast hidden"></div>
 
 <script>
@@ -133,8 +142,8 @@ function toast(t, cls) {
   clearTimeout(toast.t); toast.t = setTimeout(() => e.className = 'toast hidden', 3500);
 }
 function tab(n) {
-  $('tabCatat').classList.toggle('hidden', n !== 'catat'); $('tabDaftar').classList.toggle('hidden', n !== 'daftar');
-  $('tbCatat').classList.toggle('on', n === 'catat'); $('tbDaftar').classList.toggle('on', n === 'daftar');
+  $('tabCatat').classList.toggle('hidden', n !== 'catat'); $('tabDaftar').classList.toggle('hidden', n !== 'daftar'); $('tabLog').classList.toggle('hidden', n !== 'log');
+  $('tbCatat').classList.toggle('on', n === 'catat'); $('tbDaftar').classList.toggle('on', n === 'daftar'); $('tbLog').classList.toggle('on', n === 'log');
   window.scrollTo(0, 0);
 }
 function updNik() {
@@ -142,7 +151,16 @@ function updNik() {
   e.textContent = v.length + '/16' + (ok ? ' ✓' : ''); e.className = ok ? 'ok' : '';
 }
 function updBtn() { if (!sedangSimpan) $('btnSave').disabled = !$('ktp').checked; }
+function ubahJenis() {
+  const j = $('jenis').value;
+  $('boxNik').classList.toggle('hidden', j !== 'KTP');
+  $('boxNoId').classList.toggle('hidden', j !== 'Dokumen lain');
+  $('lblKtp').textContent = j === 'KTP' ? 'KTP fisik sudah dicek dan dikembalikan'
+    : j === 'Dokumen lain' ? 'Dokumen identitas sudah dicek dan dikembalikan'
+    : 'Saya paham tamu ini tanpa identitas dan tuan rumah menjadi penjamin';
+}
 function tampilForm() {
+  $('jenis').value = 'KTP'; ubahJenis();
   $('sukses').classList.add('hidden'); $('formBox').classList.remove('hidden'); tab('catat'); updNik();
 }
 
@@ -231,6 +249,7 @@ async function mulai(pesan) {
   const th = prof.peran === 'tuan_rumah';
   $('idPetugas').textContent = LBL[prof.peran] + ': ' + (session.user.email || '').split('@')[0];
   $('tbCatat').classList.toggle('hidden', th);
+  $('tbLog').classList.toggle('hidden', prof.peran !== 'pengurus');
   $('tbDaftar').textContent = th ? '📋 Tamu Saya' : '📋 Daftar Tamu';
   tab(th ? 'daftar' : 'catat');
 
@@ -260,20 +279,21 @@ async function simpan() {
 
 async function prosesSimpan() {
   const msg = $('formMsg'); show(msg, '');
+  const jenis = $('jenis').value;
   const nik = $('nik').value.trim();
-  const salah = cekNik(nik);
-  if (salah) return show(msg, salah, 'err');
+  if (jenis === 'KTP') { const salah = cekNik(nik); if (salah) return show(msg, salah, 'err'); }
+  if (jenis === 'Dokumen lain' && !$('noIdentitas').value.trim()) return show(msg, 'Nomor dokumen wajib diisi.', 'err');
   if (!$('nama').value.trim()) return show(msg, 'Nama tamu wajib diisi.', 'err');
   const hp = cekHp($('hp').value);
   if (!hp.ok) return show(msg, 'No. HP tidak valid. Isi 9-15 digit angka, atau kosongkan.', 'err');
   if (!$('warga').value) return show(msg, 'Pilih tuan rumah yang dituju.', 'err');
   if (!$('pj').value.trim()) return show(msg, 'Penanggung jawab wajib diisi.', 'err');
-  if (!$('ktp').checked) return show(msg, 'Centang dulu: KTP fisik sudah dicek.', 'err');
+  if (!$('ktp').checked) return show(msg, 'Centang dulu pernyataan verifikasi identitas.', 'err');
 
   const { data, error } = await db.rpc('catat_tamu', {
-    p_nik: nik, p_nama: $('nama').value.trim(), p_no_hp: hp.val, p_asal: $('asal').value.trim(),
+    p_nik: jenis === 'KTP' ? nik : null, p_jenis: jenis, p_no_identitas: jenis === 'Dokumen lain' ? $('noIdentitas').value.trim() : null, p_nama: $('nama').value.trim(), p_no_hp: hp.val, p_asal: $('asal').value.trim(),
     p_tujuan: $('tujuan').value.trim(), p_warga_id: $('warga').value,
-    p_pj: $('pj').value.trim(), p_ktp: true
+    p_pj: $('pj').value.trim(), p_ktp: jenis === 'KTP'
   });
 
   if (error) {
@@ -284,18 +304,23 @@ async function prosesSimpan() {
   $('noDok').textContent = data;
   $('sukNama').textContent = 'Tamu: ' + $('nama').value.trim();
   $('formBox').classList.add('hidden'); $('sukses').classList.remove('hidden'); window.scrollTo(0, 0);
-  ['nik','nama','hp','asal','tujuan','pj'].forEach(i => $(i).value = '');
+  ['nik','nama','hp','asal','tujuan','pj','noIdentitas'].forEach(i => $(i).value = '');
   $('warga').value = ''; $('ktp').checked = false; pjManual = false;
   muatDaftar();
 }
 
 async function muatDaftar() {
   if (!dataTamu.length) $('daftar').innerHTML = '<div class="kosong">Memuat...</div>';
-  const awal = new Date(); awal.setHours(0,0,0,0);
-  const { data, error } = await db.from('v_tamu')
-    .select('*')
-    .or(`tgl_keluar.is.null,tgl_masuk.gte.${awal.toISOString()}`)
-    .order('tgl_masuk', { ascending: false });
+  let qy = db.from('v_tamu').select('*');
+  const dari = $('tglDari').value, sampai = $('tglSampai').value;
+  if (dari || sampai) {
+    if (dari) qy = qy.gte('tgl_masuk', new Date(dari + 'T00:00:00').toISOString());
+    if (sampai) qy = qy.lte('tgl_masuk', new Date(sampai + 'T23:59:59').toISOString());
+  } else {
+    const awal = new Date(); awal.setHours(0,0,0,0);
+    qy = qy.or(`tgl_keluar.is.null,tgl_masuk.gte.${awal.toISOString()}`);
+  }
+  const { data, error } = await qy.order('tgl_masuk', { ascending: false });
   if (error) {
     if (await tanganiSesi(error)) return;
     return $('daftar').innerHTML = `<div class="kosong">Gagal memuat daftar: ${esc(pesanError(error))}</div>`;
@@ -305,6 +330,9 @@ async function muatDaftar() {
 }
 
 function aksiTamu(t) {
+  return aksiDasar(t) + (profil.peran === 'pengurus' && t.nik_samar ? `<button class="small alt" onclick="lihatNik('${esc(t.id)}')">Lihat NIK</button>` : '');
+}
+function aksiDasar(t) {
   const id = esc(t.id), th = profil.peran === 'tuan_rumah';
   if (t.status === 'Menunggu') return th
     ? `<button class="small" onclick="konfirmasi('${id}', true)">Ya, tamu saya</button><button class="small no" onclick="konfirmasi('${id}', false)">Bukan tamu saya</button>`
@@ -323,7 +351,7 @@ function renderDaftar() {
   $('daftar').innerHTML = list.length ? list.map(t => `
     <div class="tamu">
       <div class="row"><b>${esc(t.nama)}</b><span><span class="tag ${esc(t.status)}">${esc(t.status)}</span>${t.lewat_24 ? ' <span class="tag Lewat">Lewat 24 jam</span>' : ''}</span></div>
-      <small>${esc(t.no_dokumen)} · ${esc(t.nik_samar)}</small>
+      <small>${esc(t.no_dokumen)} · ${esc(t.nik_samar || t.no_identitas || 'Tanpa identitas')}</small>${t.jenis_identitas && t.jenis_identitas !== 'KTP' ? '<small>⚠ Identitas: ' + esc(t.jenis_identitas) + '</small>' : ''}
       <div>Dituju: ${esc(t.warga_nama)} <small>· PJ: ${esc(t.penanggung_jawab)}</small></div>
       <small>Masuk ${jam(t.tgl_masuk)}${t.cara_konfirmasi ? ' · Konfirmasi: ' + esc(t.cara_konfirmasi) : ''}${t.status === 'Ditolak' && t.catatan ? ' · Alasan: ' + esc(t.catatan) : ''}</small>
       <div class="act">${aksiTamu(t)}</div>
@@ -341,6 +369,24 @@ async function aksiRpc(fn, args, ok) {
   } finally { sibuk = false; }
   muatDaftar();
 }
+async function lihatNik(id) {
+  if (!confirm('NIK lengkap akan dibuka dan dicatat di log audit. Lanjut?')) return;
+  const { data, error } = await db.rpc('lihat_nik', { p_id: id });
+  if (error) { if (await tanganiSesi(error)) return; return toast('Gagal: ' + pesanError(error), 'err'); }
+  alert('NIK: ' + data);
+}
+
+const AKSI = { catat_tamu: 'Mencatat tamu', tandai_keluar: 'Tandai keluar', konfirmasi_ya: 'Tuan rumah: ya, tamu saya', konfirmasi_tolak: 'Tuan rumah: bukan tamu saya', konfirmasi_telepon: 'Konfirmasi via telepon', lihat_nik: 'Membuka NIK lengkap' };
+async function muatLog() {
+  $('logList').innerHTML = '<div class="kosong">Memuat...</div>';
+  const { data, error } = await db.from('v_audit').select('*').order('waktu', { ascending: false }).limit(200);
+  if (error) { if (await tanganiSesi(error)) return; return $('logList').innerHTML = `<div class="kosong">Gagal memuat log: ${esc(pesanError(error))}</div>`; }
+  $('logList').innerHTML = data.length ? data.map(l => `
+    <div class="tamu"><div class="row"><b>${esc(AKSI[l.aksi] || l.aksi)}</b><small>${jam(l.waktu)}</small></div>
+    <small>${esc((l.aktor || '').split('@')[0])} · ${esc(l.no_dokumen || '')}${l.detail ? ' · ' + esc(l.detail) : ''}</small></div>`).join('')
+    : '<div class="kosong">Belum ada catatan.</div>';
+}
+
 function keluar(id) { if (confirm('Tandai tamu ini sudah keluar?')) aksiRpc('keluar_tamu', { p_id: id }, 'Tamu ditandai keluar'); }
 function telepon(id) { if (confirm('Tuan rumah sudah mengonfirmasi tamu ini lewat telepon/WA?')) aksiRpc('konfirmasi_telepon', { p_id: id }, 'Dikonfirmasi via telepon'); }
 function konfirmasi(id, setuju) {
@@ -353,7 +399,7 @@ $('btnLogin').onclick = masuk;
 $('btnSave').onclick = simpan;
 $('btnOut').onclick = async () => {
   await db.auth.signOut();
-  ['nik','nama','hp','asal','tujuan','pj','email','pass'].forEach(i => $(i).value = '');
+  ['nik','nama','hp','asal','tujuan','pj','noIdentitas','email','pass'].forEach(i => $(i).value = '');
   pjManual = false; dataTamu = []; $('daftar').innerHTML = '';
   tampilForm();
   mulai();
@@ -372,6 +418,10 @@ $('fStatus').addEventListener('change', renderDaftar);
 $('btnNext').onclick = tampilForm;
 $('tbCatat').onclick = () => tab('catat');
 $('tbDaftar').onclick = () => { tab('daftar'); muatDaftar(); };
+$('tbLog').onclick = () => { tab('log'); muatLog(); };
+$('jenis').addEventListener('change', ubahJenis);
+$('tglDari').addEventListener('change', muatDaftar);
+$('tglSampai').addEventListener('change', muatDaftar);
 mulai();
 </script>
 </body>
