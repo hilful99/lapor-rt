@@ -45,7 +45,8 @@ button.ghost{width:auto;margin:0;background:#ffffff26;padding:6px 12px;font-size
 .tamu{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px #0002;display:grid;gap:6px}
 .tamu small{color:var(--mut)}
 .tag{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700}
-.Aktif{background:var(--warnbg);color:var(--warn)}.Selesai{background:var(--okbg);color:var(--ok)}
+.Menunggu{background:var(--warnbg);color:var(--warn)}.Terkonfirmasi{background:var(--okbg);color:var(--ok)}.Ditolak,.Lewat{background:var(--erbg);color:var(--er)}.Selesai{background:var(--line);color:var(--mut)}
+button.small.no{background:#b3261e}.act{display:flex;gap:8px;flex-wrap:wrap}
 .kosong{text-align:center;color:var(--mut);padding:30px 10px}
 nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
 nav button{margin:0;background:none;color:var(--mut);border-radius:0;padding:14px 8px;flex:1}
@@ -98,10 +99,11 @@ nav button.on{color:var(--pri);box-shadow:inset 0 3px 0 var(--pri)}
 
   <div id="tabDaftar" class="hidden">
     <div class="sum">
-      <div><b id="sAktif">0</b><span>Aktif</span></div>
-      <div><b id="sSelesai">0</b><span>Sudah keluar</span></div>
-      <div><b id="sTotal">0</b><span>Total</span></div>
+      <div><b id="sAktif">0</b><span>Menunggu</span></div>
+      <div><b id="sSelesai">0</b><span>Terkonfirmasi</span></div>
+      <div><b id="sTotal">0</b><span>Lewat 24 jam</span></div>
     </div>
+    <select id="fStatus" style="margin-bottom:10px"><option value="">Semua status</option><option>Menunggu</option><option>Terkonfirmasi</option><option>Ditolak</option><option>Selesai</option><option value="Lewat">Lewat 24 jam</option></select>
     <input id="cari" type="search" placeholder="Cari nama atau nomor dokumen">
     <div id="daftar"></div>
   </div>
@@ -122,6 +124,9 @@ let wargaList = [];
 let pjManual = false;      // true kalau penanggung jawab diubah manual oleh petugas
 let sedangSimpan = false;  // mencegah simpan ganda
 let dataTamu = [];
+let profil = { peran: 'petugas' };
+let sibuk = false;
+const LBL = { petugas: 'Petugas', tuan_rumah: 'Tuan rumah', pengurus: 'Pengurus RT' };
 
 function toast(t, cls) {
   const e = $('toast'); e.textContent = t; e.className = 'toast ' + (cls || '');
@@ -150,6 +155,7 @@ const jam = t => new Date(t).toLocaleString('id-ID', {day:'2-digit', month:'shor
 function pesanError(err) {
   const m = ((err && err.message) || '').toLowerCase();
   const c = err && err.code;
+  if (c === 'P0001') return err.message;
   if (c === '23505') return 'NIK ini masih tercatat sebagai tamu aktif. Tandai keluar dulu jika sudah pulang.';
   if (m.includes('invalid login')) return 'ID akun atau password salah.';
   if (m.includes('not confirmed')) return 'Akun belum aktif. Hubungi pengurus RT.';
@@ -218,7 +224,15 @@ async function mulai(pesan) {
     return show($('loginMsg'), pesan ? esc(pesan) : '', 'err');
   }
   show($('loginMsg'), '');
-  $('idPetugas').textContent = 'Petugas: ' + ((session.user.email || '').split('@')[0]);
+  const { data: prof, error: pe } = await db.from('profiles').select('peran,nama,warga_id').eq('id', session.user.id).maybeSingle();
+  if (pe && await tanganiSesi(pe)) return;
+  if (!prof) { await db.auth.signOut(); return mulai('Akun belum diberi peran. Hubungi pengurus RT.'); }
+  profil = prof;
+  const th = prof.peran === 'tuan_rumah';
+  $('idPetugas').textContent = LBL[prof.peran] + ': ' + (session.user.email || '').split('@')[0];
+  $('tbCatat').classList.toggle('hidden', th);
+  $('tbDaftar').textContent = th ? '📋 Tamu Saya' : '📋 Daftar Tamu';
+  tab(th ? 'daftar' : 'catat');
 
   // Nama lingkungan di header (opsional, dari tabel pengaturan)
   try {
@@ -256,19 +270,19 @@ async function prosesSimpan() {
   if (!$('pj').value.trim()) return show(msg, 'Penanggung jawab wajib diisi.', 'err');
   if (!$('ktp').checked) return show(msg, 'Centang dulu: KTP fisik sudah dicek.', 'err');
 
-  const { data, error } = await db.from('tamu').insert({
-    nik, nama: $('nama').value.trim(), no_hp: hp.val, asal: $('asal').value.trim(),
-    tujuan: $('tujuan').value.trim(), warga_id: $('warga').value,
-    penanggung_jawab: $('pj').value.trim(), ktp_dicek: true
-  }).select().single();
+  const { data, error } = await db.rpc('catat_tamu', {
+    p_nik: nik, p_nama: $('nama').value.trim(), p_no_hp: hp.val, p_asal: $('asal').value.trim(),
+    p_tujuan: $('tujuan').value.trim(), p_warga_id: $('warga').value,
+    p_pj: $('pj').value.trim(), p_ktp: true
+  });
 
   if (error) {
     if (await tanganiSesi(error)) return;
     return show(msg, 'Gagal menyimpan: ' + esc(pesanError(error)), 'err');
   }
   show(msg, '');
-  $('noDok').textContent = data.no_dokumen;
-  $('sukNama').textContent = 'Tamu: ' + data.nama;
+  $('noDok').textContent = data;
+  $('sukNama').textContent = 'Tamu: ' + $('nama').value.trim();
   $('formBox').classList.add('hidden'); $('sukses').classList.remove('hidden'); window.scrollTo(0, 0);
   ['nik','nama','hp','asal','tujuan','pj'].forEach(i => $(i).value = '');
   $('warga').value = ''; $('ktp').checked = false; pjManual = false;
@@ -278,8 +292,8 @@ async function prosesSimpan() {
 async function muatDaftar() {
   if (!dataTamu.length) $('daftar').innerHTML = '<div class="kosong">Memuat...</div>';
   const awal = new Date(); awal.setHours(0,0,0,0);
-  const { data, error } = await db.from('tamu')
-    .select('*, warga(nama, blok)')
+  const { data, error } = await db.from('v_tamu')
+    .select('*')
     .or(`tgl_keluar.is.null,tgl_masuk.gte.${awal.toISOString()}`)
     .order('tgl_masuk', { ascending: false });
   if (error) {
@@ -290,31 +304,49 @@ async function muatDaftar() {
   renderDaftar();
 }
 
+function aksiTamu(t) {
+  const id = esc(t.id), th = profil.peran === 'tuan_rumah';
+  if (t.status === 'Menunggu') return th
+    ? `<button class="small" onclick="konfirmasi('${id}', true)">Ya, tamu saya</button><button class="small no" onclick="konfirmasi('${id}', false)">Bukan tamu saya</button>`
+    : `<button class="small" onclick="telepon('${id}')">Konfirmasi via telepon</button><button class="small no" onclick="keluar('${id}')">Tandai keluar</button>`;
+  return t.status === 'Terkonfirmasi' && !th ? `<button class="small" onclick="keluar('${id}')">Tandai keluar</button>` : '';
+}
+
 function renderDaftar() {
-  const q = $('cari').value.trim().toLowerCase();
-  const aktif = dataTamu.filter(t => !t.tgl_keluar).length;
-  $('sAktif').textContent = aktif; $('sSelesai').textContent = dataTamu.length - aktif; $('sTotal').textContent = dataTamu.length;
-  const list = dataTamu.filter(t => !q || (t.nama || '').toLowerCase().includes(q) || (t.no_dokumen || '').toLowerCase().includes(q));
+  const q = $('cari').value.trim().toLowerCase(), f = $('fStatus').value;
+  const hit = s => dataTamu.filter(t => t.status === s).length;
+  $('sAktif').textContent = hit('Menunggu'); $('sSelesai').textContent = hit('Terkonfirmasi');
+  $('sTotal').textContent = dataTamu.filter(t => t.lewat_24).length;
+  const list = dataTamu.filter(t =>
+    (!q || (t.nama || '').toLowerCase().includes(q) || (t.no_dokumen || '').toLowerCase().includes(q)) &&
+    (!f || (f === 'Lewat' ? t.lewat_24 : t.status === f)));
   $('daftar').innerHTML = list.length ? list.map(t => `
     <div class="tamu">
-      <div class="row"><b>${esc(t.nama)}</b><span class="tag ${esc(t.status)}">${esc(t.status)}</span></div>
-      <small>${esc(t.no_dokumen)} · ${esc(maskNik(t.nik))}</small>
-      <div>Dituju: ${esc(t.warga?.nama)} <small>· PJ: ${esc(t.penanggung_jawab)}</small></div>
-      <div class="row"><small>Masuk ${jam(t.tgl_masuk)}</small>
-        ${t.tgl_keluar ? `<small>Keluar ${jam(t.tgl_keluar)}</small>` : `<button class="small" onclick="keluar('${esc(t.id)}', this)">Tandai keluar</button>`}</div>
+      <div class="row"><b>${esc(t.nama)}</b><span><span class="tag ${esc(t.status)}">${esc(t.status)}</span>${t.lewat_24 ? ' <span class="tag Lewat">Lewat 24 jam</span>' : ''}</span></div>
+      <small>${esc(t.no_dokumen)} · ${esc(t.nik_samar)}</small>
+      <div>Dituju: ${esc(t.warga_nama)} <small>· PJ: ${esc(t.penanggung_jawab)}</small></div>
+      <small>Masuk ${jam(t.tgl_masuk)}${t.cara_konfirmasi ? ' · Konfirmasi: ' + esc(t.cara_konfirmasi) : ''}${t.status === 'Ditolak' && t.catatan ? ' · Alasan: ' + esc(t.catatan) : ''}</small>
+      <div class="act">${aksiTamu(t)}</div>
     </div>`).join('')
     : `<div class="kosong">${dataTamu.length ? 'Tidak ada yang cocok.' : 'Belum ada tamu hari ini.'}</div>`;
 }
 
-async function keluar(id, tombol) {
-  if (!confirm('Tandai tamu ini sudah keluar?')) return;
-  tombol.disabled = true; tombol.textContent = 'Memproses...';
-  const { error } = await db.from('tamu').update({ tgl_keluar: new Date().toISOString(), status: 'Selesai' }).eq('id', id);
-  if (error) {
-    if (await tanganiSesi(error)) return;
-    toast('Gagal menandai keluar: ' + pesanError(error), 'err');
-  } else toast('Tamu ditandai keluar', 'ok');
+async function aksiRpc(fn, args, ok) {
+  if (sibuk) return;
+  sibuk = true;
+  try {
+    const { error } = await db.rpc(fn, args);
+    if (error) { if (await tanganiSesi(error)) return; toast('Gagal: ' + pesanError(error), 'err'); }
+    else toast(ok, 'ok');
+  } finally { sibuk = false; }
   muatDaftar();
+}
+function keluar(id) { if (confirm('Tandai tamu ini sudah keluar?')) aksiRpc('keluar_tamu', { p_id: id }, 'Tamu ditandai keluar'); }
+function telepon(id) { if (confirm('Tuan rumah sudah mengonfirmasi tamu ini lewat telepon/WA?')) aksiRpc('konfirmasi_telepon', { p_id: id }, 'Dikonfirmasi via telepon'); }
+function konfirmasi(id, setuju) {
+  if (setuju) { if (confirm('Benar, ini tamu Anda?')) aksiRpc('konfirmasi_tamu', { p_id: id, p_setuju: true }, 'Tamu dikonfirmasi'); return; }
+  const alasan = prompt('Alasan tidak mengenal tamu ini (boleh kosong):');
+  if (alasan !== null) aksiRpc('konfirmasi_tamu', { p_id: id, p_setuju: false, p_alasan: alasan.trim() || null }, 'Tamu ditolak');
 }
 
 $('btnLogin').onclick = masuk;
@@ -336,6 +368,7 @@ $('warga').onchange = () => {
 $('nik').addEventListener('input', updNik);
 $('ktp').addEventListener('change', updBtn);
 $('cari').addEventListener('input', renderDaftar);
+$('fStatus').addEventListener('change', renderDaftar);
 $('btnNext').onclick = tampilForm;
 $('tbCatat').onclick = () => tab('catat');
 $('tbDaftar').onclick = () => { tab('daftar'); muatDaftar(); };
