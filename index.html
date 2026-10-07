@@ -15,6 +15,7 @@
   label{display:block;font-size:14px;margin:10px 0 4px;font-weight:600}
   input,select,button{font:inherit;width:100%;padding:10px;border:1px solid #c5ccd6;border-radius:8px}
   button{background:#1f5fa8;color:#fff;border:0;cursor:pointer;margin-top:14px;font-weight:600}
+  button:disabled{opacity:.6;cursor:not-allowed}
   button.small{width:auto;margin:0;padding:6px 10px;font-size:13px;background:#2e7d32}
   button.ghost{width:auto;margin:0;background:#fff3;padding:6px 12px}
   .chk{display:flex;gap:8px;align-items:center;margin-top:14px}
@@ -27,10 +28,11 @@
   .tag{padding:2px 8px;border-radius:99px;font-size:12px}
   .Aktif{background:#fff3cd}.Selesai{background:#e6f4ea}
   .hidden{display:none}
+  .who{display:flex;gap:10px;align-items:center;font-size:13px}
 </style>
 </head>
 <body>
-<header><h1>Lapor Tamu RT 1x24 Jam</h1><button id="btnOut" class="ghost hidden">Keluar</button></header>
+<header><h1 id="judul">Lapor Tamu RT 1x24 Jam</h1><div class="who"><span id="idPetugas" class="hidden"></span><button id="btnOut" class="ghost hidden">Keluar</button></div></header>
 <main>
 
 <!-- LOGIN -->
@@ -49,7 +51,7 @@
     <label>NIK (16 digit, sesuai KTP yang diperlihatkan)</label>
     <input id="nik" inputmode="numeric" maxlength="16" placeholder="16 digit angka">
     <label>Nama Tamu</label><input id="nama">
-    <label>No. HP</label><input id="hp" inputmode="tel">
+    <label>No. HP</label><input id="hp" type="tel" inputmode="tel" placeholder="08xxxxxxxxxx (boleh kosong)">
     <label>Asal Daerah</label><input id="asal">
     <label>Tujuan Kunjungan</label><input id="tujuan" placeholder="Keluarga, kerja, kontrak, dll">
     <label>Tuan Rumah yang Dituju</label><select id="warga"></select>
@@ -78,11 +80,38 @@ const SUPABASE_KEY = 'sb_publishable_Fwn89gdmjrJOAzgOlkH6Tw_evFLG39y';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
 let wargaList = [];
+let pjManual = false;      // true kalau penanggung jawab diubah manual oleh petugas
+let sedangSimpan = false;  // mencegah simpan ganda
 
 const show = (el, msg, cls) => el.innerHTML = msg ? `<div class="msg ${cls}">${msg}</div>` : '';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const maskNik = n => n.slice(0,4) + '********' + n.slice(-4);
+const maskNik = n => String(n).slice(0,4) + '********' + String(n).slice(-4);
 const jam = t => new Date(t).toLocaleString('id-ID', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+
+// Terjemahkan error teknis menjadi bahasa sederhana
+function pesanError(err) {
+  const m = ((err && err.message) || '').toLowerCase();
+  const c = err && err.code;
+  if (c === '23505') return 'NIK ini masih tercatat sebagai tamu aktif. Tandai keluar dulu jika sudah pulang.';
+  if (m.includes('invalid login')) return 'ID akun atau password salah.';
+  if (m.includes('not confirmed')) return 'Akun belum aktif. Hubungi pengurus RT.';
+  if (m.includes('failed to fetch') || m.includes('networkerror') || m.includes('load failed'))
+    return 'Tidak ada koneksi internet. Periksa sinyal lalu coba lagi.';
+  if (c === '42501' || m.includes('row-level security') || m.includes('permission denied'))
+    return 'Anda tidak punya izin untuk tindakan ini.';
+  if (c === '23514') return 'Format data tidak sesuai. Periksa NIK dan isian lain.';
+  if (c === '23503') return 'Data tuan rumah tidak ditemukan. Muat ulang halaman.';
+  return 'Terjadi kesalahan. Coba lagi. (kode: ' + (c || (err && err.status) || '-') + ')';
+}
+
+// Sesi login habis? Kembalikan ke layar login dengan pesan jelas
+const sesiHabis = err => !!err && (err.status === 401 || ['PGRST301','PGRST303'].includes(err.code) || /jwt|expired/i.test(err.message || ''));
+async function tanganiSesi(err) {
+  if (!sesiHabis(err)) return false;
+  await db.auth.signOut();
+  await mulai('Sesi login habis. Silakan masuk lagi.');
+  return true;
+}
 
 // Validasi NIK: 16 digit, kode wilayah, tanggal lahir valid
 function cekNik(nik) {
@@ -99,82 +128,138 @@ function cekNik(nik) {
   return null;
 }
 
-async function masuk() {
-  const id = $('email').value.trim().toLowerCase().split('@')[0];
-  const { error } = await db.auth.signInWithPassword({ email: id + '@petugas.rt', password: $('pass').value });
-  if (error) return show($('loginMsg'), 'Login gagal: ' + esc(error.message), 'err');
-  mulai();
+// No. HP: boleh kosong; kalau diisi harus 9-15 digit (boleh diawali +, spasi/strip diabaikan)
+function cekHp(v) {
+  const x = v.replace(/[\s-]/g, '');
+  if (!x) return { ok: true, val: '' };
+  return /^\+?\d{9,15}$/.test(x) ? { ok: true, val: x } : { ok: false };
 }
 
-async function mulai() {
+async function masuk() {
+  const id = $('email').value.trim().toLowerCase().split('@')[0];
+  if (!id || !$('pass').value) return show($('loginMsg'), 'Isi ID akun dan password.', 'err');
+  const tombol = $('btnLogin');
+  tombol.disabled = true; tombol.textContent = 'Memproses...';
+  try {
+    const { error } = await db.auth.signInWithPassword({ email: id + '@petugas.rt', password: $('pass').value });
+    if (error) return show($('loginMsg'), 'Login gagal: ' + esc(pesanError(error)), 'err');
+    $('pass').value = '';
+    await mulai();
+  } finally { tombol.disabled = false; tombol.textContent = 'Masuk'; }
+}
+
+async function mulai(pesan) {
   const { data: { session } } = await db.auth.getSession();
   $('viewLogin').classList.toggle('hidden', !!session);
   $('viewApp').classList.toggle('hidden', !session);
   $('btnOut').classList.toggle('hidden', !session);
-  if (!session) return;
-  const { data } = await db.from('warga').select('*').eq('aktif', true).order('nama');
+  $('idPetugas').classList.toggle('hidden', !session);
+  if (!session) {
+    $('judul').textContent = 'Lapor Tamu RT 1x24 Jam';
+    return show($('loginMsg'), pesan ? esc(pesan) : '', 'err');
+  }
+  show($('loginMsg'), '');
+  $('idPetugas').textContent = 'Petugas: ' + ((session.user.email || '').split('@')[0]);
+
+  // Nama lingkungan di header (opsional, dari tabel pengaturan)
+  try {
+    const { data: set } = await db.from('pengaturan').select('kunci,nilai');
+    const n = (set || []).find(x => x.kunci === 'nama_lingkungan');
+    $('judul').textContent = n && n.nilai ? 'Lapor Tamu · ' + n.nilai : 'Lapor Tamu RT 1x24 Jam';
+  } catch (e) { /* tabel belum ada: abaikan */ }
+
+  const { data, error } = await db.from('warga').select('*').eq('aktif', true).order('nama');
+  if (error && await tanganiSesi(error)) return;
   wargaList = data || [];
   $('warga').innerHTML = '<option value="">- pilih tuan rumah -</option>' +
-    wargaList.map(w => `<option value="${w.id}">${esc(w.nama)}${w.blok ? ' (' + esc(w.blok) + ')' : ''}</option>`).join('');
+    wargaList.map(w => `<option value="${esc(w.id)}">${esc(w.nama)}${w.blok ? ' (' + esc(w.blok) + ')' : ''}</option>`).join('');
   muatDaftar();
 }
 
 async function simpan() {
+  if (sedangSimpan) return;               // abaikan tekan kedua kali
+  sedangSimpan = true;
+  const tombol = $('btnSave');
+  tombol.disabled = true; tombol.textContent = 'Menyimpan...';
+  try { await prosesSimpan(); }
+  finally { sedangSimpan = false; tombol.disabled = false; tombol.textContent = 'Simpan Laporan'; }
+}
+
+async function prosesSimpan() {
   const msg = $('formMsg'); show(msg, '');
   const nik = $('nik').value.trim();
   const salah = cekNik(nik);
   if (salah) return show(msg, salah, 'err');
   if (!$('nama').value.trim()) return show(msg, 'Nama tamu wajib diisi.', 'err');
+  const hp = cekHp($('hp').value);
+  if (!hp.ok) return show(msg, 'No. HP tidak valid. Isi 9-15 digit angka, atau kosongkan.', 'err');
   if (!$('warga').value) return show(msg, 'Pilih tuan rumah yang dituju.', 'err');
   if (!$('pj').value.trim()) return show(msg, 'Penanggung jawab wajib diisi.', 'err');
   if (!$('ktp').checked) return show(msg, 'Centang dulu: KTP fisik sudah dicek.', 'err');
 
   const { data, error } = await db.from('tamu').insert({
-    nik, nama: $('nama').value.trim(), no_hp: $('hp').value.trim(), asal: $('asal').value.trim(),
+    nik, nama: $('nama').value.trim(), no_hp: hp.val, asal: $('asal').value.trim(),
     tujuan: $('tujuan').value.trim(), warga_id: $('warga').value,
     penanggung_jawab: $('pj').value.trim(), ktp_dicek: true
   }).select().single();
 
   if (error) {
-    if (error.code === '23505') return show(msg, 'NIK ini masih tercatat sebagai tamu aktif. Tandai keluar dulu jika sudah pulang.', 'err');
-    return show(msg, 'Gagal menyimpan: ' + esc(error.message), 'err');
+    if (await tanganiSesi(error)) return;
+    return show(msg, 'Gagal menyimpan: ' + esc(pesanError(error)), 'err');
   }
   show(msg, 'Tersimpan. Nomor dokumen: <b>' + esc(data.no_dokumen) + '</b>', 'ok');
   ['nik','nama','hp','asal','tujuan','pj'].forEach(i => $(i).value = '');
-  $('warga').value = ''; $('ktp').checked = false;
+  $('warga').value = ''; $('ktp').checked = false; pjManual = false;
   muatDaftar();
 }
 
 async function muatDaftar() {
+  if (!$('rows').children.length) $('rows').innerHTML = '<tr><td colspan="6">Memuat...</td></tr>';
   const awal = new Date(); awal.setHours(0,0,0,0);
   const { data, error } = await db.from('tamu')
     .select('*, warga(nama, blok)')
     .or(`tgl_keluar.is.null,tgl_masuk.gte.${awal.toISOString()}`)
     .order('tgl_masuk', { ascending: false });
-  if (error) return $('rows').innerHTML = `<tr><td colspan="6">Gagal memuat: ${esc(error.message)}</td></tr>`;
+  if (error) {
+    if (await tanganiSesi(error)) return;
+    return $('rows').innerHTML = `<tr><td colspan="6">Gagal memuat daftar: ${esc(pesanError(error))}</td></tr>`;
+  }
   $('rows').innerHTML = data.length ? data.map(t => `
     <tr>
       <td>${esc(t.no_dokumen)}</td>
-      <td>${esc(t.nama)}<br><small>${maskNik(t.nik)}</small></td>
+      <td>${esc(t.nama)}<br><small>${esc(maskNik(t.nik))}</small></td>
       <td>${esc(t.warga?.nama)}<br><small>PJ: ${esc(t.penanggung_jawab)}</small></td>
       <td>${jam(t.tgl_masuk)}</td>
-      <td><span class="tag ${t.status}">${t.status}</span></td>
-      <td>${t.tgl_keluar ? '' : `<button class="small" onclick="keluar('${t.id}')">Tandai keluar</button>`}</td>
+      <td><span class="tag ${esc(t.status)}">${esc(t.status)}</span></td>
+      <td>${t.tgl_keluar ? '' : `<button class="small" onclick="keluar('${esc(t.id)}', this)">Tandai keluar</button>`}</td>
     </tr>`).join('') : '<tr><td colspan="6">Belum ada tamu.</td></tr>';
 }
 
-async function keluar(id) {
+async function keluar(id, tombol) {
   if (!confirm('Tandai tamu ini sudah keluar?')) return;
-  await db.from('tamu').update({ tgl_keluar: new Date().toISOString(), status: 'Selesai' }).eq('id', id);
+  tombol.disabled = true; tombol.textContent = 'Memproses...';
+  const { error } = await db.from('tamu').update({ tgl_keluar: new Date().toISOString(), status: 'Selesai' }).eq('id', id);
+  if (error) {
+    if (await tanganiSesi(error)) return;
+    alert('Gagal menandai keluar: ' + pesanError(error));
+  }
   muatDaftar();
 }
 
 $('btnLogin').onclick = masuk;
 $('btnSave').onclick = simpan;
-$('btnOut').onclick = async () => { await db.auth.signOut(); mulai(); };
+$('btnOut').onclick = async () => {
+  await db.auth.signOut();
+  ['nik','nama','hp','asal','tujuan','pj','email','pass'].forEach(i => $(i).value = '');
+  pjManual = false;
+  mulai();
+};
+['email', 'pass'].forEach(i => $(i).addEventListener('keydown', e => { if (e.key === 'Enter') masuk(); }));
+$('nik').addEventListener('input', () => { $('nik').value = $('nik').value.replace(/\D/g, '').slice(0, 16); });
+$('pj').addEventListener('input', () => { pjManual = $('pj').value.trim() !== ''; });
 $('warga').onchange = () => {
   const w = wargaList.find(x => x.id === $('warga').value);
-  if (w && !$('pj').value) $('pj').value = w.nama;
+  if (!pjManual) $('pj').value = w ? w.nama : '';
 };
 mulai();
 </script>
