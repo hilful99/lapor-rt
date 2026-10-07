@@ -1,55 +1,43 @@
 # Lapor Tamu RT 1x24 Jam - Tahap 1 (Dasar)
 
-Isi folder: `schema.sql` (database), `index.html` (aplikasi), `README.md` (panduan ini).
+Halo semua! 👋
 
-## A. Siapkan database (Supabase)
+Proyek ini adalah aplikasi web sederhana untuk mencatat tamu di lingkungan RT dengan batas waktu 1x24 jam. Awalnya, proyek ini saya buat untuk mengikuti **program lomba di kampus saya**. Sebagai seorang **pemula** dalam dunia pengembangan web, saya sangat terbuka jika ada teman-teman yang ingin melihat, memakai, atau bahkan mengembangkan proyek ini lebih lanjut.
 
-1. Buka project Supabase kamu > **SQL Editor** > **New query**.
-2. Buka `schema.sql`, cari tulisan `RT00` lalu ganti dengan kode RT kamu (misal `RT05`).
-3. Paste seluruh isinya ke SQL Editor > klik **Run**. Harus muncul "Success".
-4. **Matikan pendaftaran bebas** supaya orang luar tidak bisa membuat akun sendiri: menu **Authentication**, di pengaturan Email/Providers matikan opsi "Allow new users to sign up".
-5. Buat akun petugas: **Authentication > Users > Add user**. Di kolom email tulis `ID@petugas.rt` (contoh: `4ipul4@petugas.rt`), isi password, centang auto confirm. Petugas cukup login dengan ID-nya saja (`4ipul4`), akhiran `@petugas.rt` ditambahkan otomatis oleh aplikasi. Ulangi untuk setiap petugas. Gunakan huruf kecil semua.
-6. Isi data warga: **Table Editor > warga**, hapus dua baris contoh, lalu tambahkan warga asli (kolom `nama` dan `blok`).
-7. Ambil kunci: **Project Settings > API**. Salin **Project URL** dan **anon / publishable key**.
+## 🌟 Status Proyek
+Saat ini proyek ini sudah **Open Source / Terbuka untuk Umum**. Siapa pun boleh mempelajari kodenya, menggunakan untuk keperluan RT masing-masing, atau berkontribusi mengembangkannya.
 
-## B. Isi kunci di aplikasi
+Fitur yang sudah ada di Tahap 1:
+- Input data tamu dengan validasi NIK (16 digit).
+- Wajib centang KTP.
+- Penomoran dokumen otomatis (contoh: `LT-RT05-tanggal-0001`).
+- Pencegahan duplikasi NIK yang masih aktif.
+- Fitur "Tandai keluar".
 
-Buka `index.html`, cari dua baris ini dan ganti isinya:
+## 🚀 Ingin Ikut Mengembangkan?
+Saya sangat senang jika ada yang ingin membantu mengembangkan proyek ini, baik untuk memperbaiki bug, menambah fitur Tahap 2 (seperti konfirmasi tuan rumah, log audit, penanda lewat 1x24 jam, dll), atau sekadar memberikan masukan.
 
-```js
-const SUPABASE_URL = 'ISI_PROJECT_URL';
-const SUPABASE_KEY = 'ISI_ANON_PUBLIC_KEY';
-```
+**Cara Berkontribusi:**
+1. Fork repositori ini.
+2. Buat branch baru (`git checkout -b fitur-baru`).
+3. Commit perubahan Anda (`git commit -m 'Menambah fitur X'`).
+4. Push ke branch (`git push origin fitur-baru`).
+5. Buat Pull Request.
 
-Kunci anon memang boleh ada di file web, karena data dilindungi aturan keamanan (RLS) yang sudah dibuat `schema.sql`. Jangan pernah memakai kunci `service_role` di sini.
+## 📬 Kontak & Kerja Sama
+Jika Anda ingin berdiskusi, memberikan saran, atau tertarik untuk bekerja sama mengembangkan proyek ini, silakan hubungi saya melalui email:
 
-## C. Simpan ke GitHub
+📧 **hilfulwarday009@gmail.com**
 
-1. GitHub > **New repository**, beri nama `lapor-rt`, pilih **Private**.
-2. Klik **uploading an existing file**, upload `index.html` dan `README.md`, lalu **Commit**.
+Saya akan sangat berterima kasih atas segala bantuan, masukan, dan dukungannya. Terima kasih banyak! 🙏
 
-## D. Online-kan dengan Vercel
+## 🛠️ Teknologi yang Digunakan
+- **Database & Auth:** Supabase
+- **Frontend:** HTML, JavaScript
+- **Hosting:** Vercel
+- **Version Control:** GitHub
 
-1. Vercel > **Add New > Project** > pilih repository `lapor-rt` > **Import**.
-2. Framework Preset: **Other**. Klik **Deploy**.
-3. Selesai, kamu dapat alamat seperti `lapor-rt.vercel.app`.
-
-## E. Cek apakah sudah jalan
-
-- [ ] Login dengan akun petugas berhasil
-- [ ] NIK kurang dari 16 digit ditolak
-- [ ] Simpan tamu tanpa centang KTP ditolak
-- [ ] Simpan tamu normal: muncul nomor dokumen `LT-RT05-tanggal-0001`
-- [ ] Tamu kedua di hari yang sama dapat nomor `0002`
-- [ ] NIK yang sama diinput lagi ditolak (masih aktif)
-- [ ] "Tandai keluar" mengubah status jadi Selesai, lalu NIK itu bisa dilaporkan lagi
-
-## Catatan keamanan
-
-- Jangan bagikan alamat web dan password petugas ke sembarang orang.
-- Di daftar, NIK sudah tersamarkan (4 digit awal dan akhir saja).
+## ⚠️ Catatan Keamanan
+- Jangan pernah membagikan password petugas ke sembarang orang.
+- NIK sudah tersamarkan (4 digit awal dan akhir saja) di daftar tamu.
 - Jangan memfoto atau menulis NIK di tempat lain selain aplikasi ini.
-
-## Belum ada di Tahap 1 (masuk Tahap 2)
-
-Konfirmasi tuan rumah, peran pengurus RT, log audit, penanda lewat 1x24 jam, pencarian dan filter.
