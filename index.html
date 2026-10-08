@@ -113,7 +113,8 @@ nav button.on{color:var(--pri);box-shadow:inset 0 3px 0 var(--pri)}
     <div id="daftar"></div>
   </div>
   <div id="tabLog" class="hidden">
-    <h2>Log Aktivitas</h2><p class="mut">200 catatan terakhir.</p>
+    <h2>Log Aktivitas</h2><div class="card"><b>Penghapusan data lama</b><p class="mut" id="infoRetensi"></p><button id="btnBersih">Bersihkan sekarang</button></div>
+    <p class="mut">200 catatan terakhir.</p>
     <div id="logList"></div>
   </div>
 </section>
@@ -351,7 +352,7 @@ function renderDaftar() {
   $('daftar').innerHTML = list.length ? list.map(t => `
     <div class="tamu">
       <div class="row"><b>${esc(t.nama)}</b><span><span class="tag ${esc(t.status)}">${esc(t.status)}</span>${t.lewat_24 ? ' <span class="tag Lewat">Lewat 24 jam</span>' : ''}</span></div>
-      <small>${esc(t.no_dokumen)} · ${esc(t.nik_samar || t.no_identitas || 'Tanpa identitas')}</small>${t.jenis_identitas && t.jenis_identitas !== 'KTP' ? '<small>⚠ Identitas: ' + esc(t.jenis_identitas) + '</small>' : ''}
+      <small>${esc(t.no_dokumen)} · ${esc(t.nik_samar || t.no_identitas || (t.dibersihkan_pada ? 'Identitas sudah dihapus' : 'Tanpa identitas'))}</small>${t.jenis_identitas && t.jenis_identitas !== 'KTP' ? '<small>⚠ Identitas: ' + esc(t.jenis_identitas) + '</small>' : ''}
       <div>Dituju: ${esc(t.warga_nama)} <small>· PJ: ${esc(t.penanggung_jawab)}</small></div>
       <small>Masuk ${jam(t.tgl_masuk)}${t.cara_konfirmasi ? ' · Konfirmasi: ' + esc(t.cara_konfirmasi) : ''}${t.status === 'Ditolak' && t.catatan ? ' · Alasan: ' + esc(t.catatan) : ''}</small>
       <div class="act">${aksiTamu(t)}</div>
@@ -376,9 +377,19 @@ async function lihatNik(id) {
   alert('NIK: ' + data);
 }
 
-const AKSI = { catat_tamu: 'Mencatat tamu', tandai_keluar: 'Tandai keluar', konfirmasi_ya: 'Tuan rumah: ya, tamu saya', konfirmasi_tolak: 'Tuan rumah: bukan tamu saya', konfirmasi_telepon: 'Konfirmasi via telepon', lihat_nik: 'Membuka NIK lengkap' };
+const AKSI = { catat_tamu: 'Mencatat tamu', tandai_keluar: 'Tandai keluar', konfirmasi_ya: 'Tuan rumah: ya, tamu saya', konfirmasi_tolak: 'Tuan rumah: bukan tamu saya', konfirmasi_telepon: 'Konfirmasi via telepon', lihat_nik: 'Membuka NIK lengkap', bersihkan_data: 'Pembersihan data lama' };
+async function bersihkan() {
+  if (!confirm('Hapus data identitas tamu yang sudah melewati batas penyimpanan? Tindakan ini tidak bisa dibatalkan.')) return;
+  const { data, error } = await db.rpc('bersihkan_sekarang');
+  if (error) { if (await tanganiSesi(error)) return; return toast('Gagal: ' + pesanError(error), 'err'); }
+  toast(data + ' data identitas dihapus', 'ok'); muatLog();
+}
+
 async function muatLog() {
   $('logList').innerHTML = '<div class="kosong">Memuat...</div>';
+  const { data: set } = await db.from('pengaturan').select('kunci,nilai');
+  const h = ((set || []).find(x => x.kunci === 'retensi_hari') || {}).nilai || '90';
+  $('infoRetensi').textContent = `NIK, nomor dokumen identitas, dan No. HP tamu yang sudah selesai dihapus otomatis setelah ${h} hari. Nama dan riwayat kunjungan tetap tersimpan.`;
   const { data, error } = await db.from('v_audit').select('*').order('waktu', { ascending: false }).limit(200);
   if (error) { if (await tanganiSesi(error)) return; return $('logList').innerHTML = `<div class="kosong">Gagal memuat log: ${esc(pesanError(error))}</div>`; }
   $('logList').innerHTML = data.length ? data.map(l => `
@@ -420,6 +431,7 @@ $('tbCatat').onclick = () => tab('catat');
 $('tbDaftar').onclick = () => { tab('daftar'); muatDaftar(); };
 $('tbLog').onclick = () => { tab('log'); muatLog(); };
 $('jenis').addEventListener('change', ubahJenis);
+$('btnBersih').onclick = bersihkan;
 $('tglDari').addEventListener('change', muatDaftar);
 $('tglSampai').addEventListener('change', muatDaftar);
 mulai();
