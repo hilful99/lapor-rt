@@ -8,11 +8,12 @@
 <link rel="icon" href="icon.svg">
 <title>Lapor Tamu RT 1x24 Jam</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f3f5f8;--card:#fff;--tx:#1b2430;--mut:#667085;--line:#dfe4ec;--pri:#1f5fa8;--hd:#1f3864;--ok:#1e6b34;--okbg:#e6f4ea;--er:#9b1c1c;--erbg:#fde8e8;--warn:#8a5a00;--warnbg:#fff3cd;--inp:#fff}
 @media(prefers-color-scheme:dark){:root{--bg:#0f1720;--card:#18222e;--tx:#e8edf3;--mut:#9aa7b6;--line:#2a3746;--pri:#4b8fe0;--hd:#14233f;--ok:#7bd88f;--okbg:#17321f;--er:#ff9b9b;--erbg:#3a1b1b;--warn:#ffd36b;--warnbg:#3a2f12;--inp:#101923}}
 *{box-sizing:border-box}
-body{font-family:system-ui,sans-serif;margin:0;background:var(--bg);color:var(--tx);font-size:16px}
+body{font-family:"Arial Narrow","Archivo Narrow","Liberation Sans Narrow",Arial,sans-serif;font-stretch:condensed;margin:0;background:var(--bg);color:var(--tx);font-size:17px}
 header{background:var(--hd);color:#fff;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));display:flex;justify-content:space-between;align-items:center;gap:8px;position:sticky;top:0;z-index:5}
 header h1{font-size:17px;margin:0}
 .who{display:flex;gap:8px;align-items:center;font-size:13px}
@@ -53,19 +54,41 @@ nav button{margin:0;background:none;color:var(--mut);border-radius:0;padding:14p
 nav button.on{color:var(--pri);box-shadow:inset 0 3px 0 var(--pri)}
 .toast{position:fixed;left:14px;right:14px;bottom:calc(76px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto;padding:12px 14px;border-radius:12px;font-size:14px;z-index:9;box-shadow:0 4px 14px #0004;background:var(--card);color:var(--tx)}
 .hidden{display:none!important}
+
+#viewLogin{position:fixed;inset:0;z-index:20;display:flex;background:var(--bg)}
+#viewLogin.hidden{display:none}
+.lp{flex:0 0 42%;max-width:520px;min-width:340px;height:100%;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;overflow-y:auto;padding:max(28px,env(safe-area-inset-top)) 44px max(28px,env(safe-area-inset-bottom))}
+.lin{width:100%;max-width:340px;margin:0 auto}
+.lrt{margin:0;letter-spacing:.34em;font-size:13px;color:var(--mut)}
+.lh{margin:6px 0 4px;font-size:44px;line-height:1;font-weight:700}
+.lsub{margin:0 0 22px;color:var(--mut);font-size:17px}
+.lbar{width:44px;height:4px;border-radius:4px;background:var(--pri);margin:0 0 20px}
+.lfoto{flex:1;height:100%;background:var(--bg) url('bg-rumah.jpg') center/cover no-repeat}
+@media(max-width:760px){
+  #viewLogin{flex-direction:column}
+  .lfoto{order:-1;flex:0 0 30%;height:auto;min-height:150px}
+  .lp{flex:1;max-width:none;min-width:0;width:100%;height:auto;border-right:0;border-top:1px solid var(--line);justify-content:flex-start;padding:22px 22px max(24px,env(safe-area-inset-bottom))}
+  .lh{font-size:34px}
+}
 </style>
 </head>
 <body>
 <header><h1 id="judul">Lapor Tamu RT 1x24 Jam</h1><div class="who"><span id="idPetugas" class="hidden"></span><button id="btnOut" class="ghost hidden">Keluar</button></div></header>
 <main>
 
-<section id="viewLogin" class="card">
-  <h2>Login Petugas</h2>
-  <p class="mut">Masuk dengan ID akun yang diberikan pengurus RT.</p>
-  <label for="email">ID Akun</label><input id="email" autocomplete="username" autocapitalize="none" placeholder="contoh: 4ipul4">
-  <label for="pass">Password</label><input id="pass" type="password" autocomplete="current-password">
-  <button id="btnLogin">Masuk</button>
-  <div id="loginMsg"></div>
+<section id="viewLogin">
+  <div class="lp"><div class="lin">
+    <p class="lrt">RT 09</p>
+    <h2 class="lh">Bina Nusa Residence</h2>
+    <p class="lsub">Lapor Tamu 1x24 Jam</p>
+    <div class="lbar"></div>
+    <p class="mut">Masuk dengan ID akun yang diberikan pengurus RT.</p>
+    <label for="email">ID Akun</label><input id="email" autocomplete="username" autocapitalize="none" placeholder="contoh: 4ipul4">
+    <label for="pass">Password</label><input id="pass" type="password" autocomplete="current-password">
+    <button id="btnLogin">Masuk</button>
+    <div id="loginMsg"></div>
+  </div></div>
+  <div class="lfoto" role="img" aria-label="Rumah di Bina Nusa Residence saat senja"></div>
 </section>
 
 <section id="viewApp" class="hidden">
