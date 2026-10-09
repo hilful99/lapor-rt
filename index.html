@@ -75,6 +75,17 @@ nav button.on{color:var(--pri);box-shadow:inset 0 3px 0 var(--pri)}
 @media(prefers-color-scheme:dark){:root{--o:.18}}
 body{position:relative}
 body::before{content:"";position:fixed;inset:0;z-index:-1;background:url('bg-rumah.jpg') center/cover no-repeat;opacity:var(--o);pointer-events:none}
+
+.darurat{position:relative;margin:0 0 14px;border-radius:12px;overflow:hidden;border:1px solid var(--er);background:var(--erbg);color:var(--er);padding:10px 12px 14px}
+.dtop{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.04em;font-size:15px}
+.dtag{flex:none;padding:3px 9px;border-radius:999px;background:var(--er);color:var(--erbg);font-size:13px}
+.dteks{margin:6px 0 0;font-size:15px;line-height:1.35;color:var(--tx)}
+.dlampu{position:absolute;left:0;right:0;bottom:0;height:4px;background:transparent}
+.dlampu::before,.dlampu::after{content:"";position:absolute;bottom:0;width:22px;height:4px;border-radius:4px;animation:dkiri 2.4s ease-in-out infinite alternate}
+.dlampu::before{background:#e53935;box-shadow:0 0 8px #e53935}
+.dlampu::after{background:#1e88e5;box-shadow:0 0 8px #1e88e5;animation-delay:1.2s}
+@keyframes dkiri{from{left:0}to{left:calc(100% - 22px)}}
+@media(prefers-reduced-motion:reduce){.dlampu::before,.dlampu::after{animation:none;left:0}.dlampu::after{display:none}}
 </style>
 </head>
 <body>
@@ -97,6 +108,7 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;background:url('bg-rum
 </section>
 
 <section id="viewApp" class="hidden">
+  <div id="darurat" class="darurat" role="note" aria-label="Catatan darurat"><div class="dtop"><span class="dtag">DARURAT</span><span>Verifikasi warga</span></div><p class="dteks" id="dteks"></p><div class="dlampu" aria-hidden="true"></div></div>
   <div id="tabCatat">
     <div id="formBox" class="card">
       <h2>Catat Tamu Baru</h2>
@@ -259,6 +271,12 @@ async function masuk() {
   } finally { tombol.disabled = false; tombol.textContent = 'Masuk'; }
 }
 
+const DARURAT_BAWAAN = 'Ada kejadian darurat? Verifikasi ke warga terdekat, lalu hubungi Ketua RT atau Satpam.';
+function tampilDarurat(teks) {
+  $('darurat').classList.toggle('hidden', teks === '-');
+  $('dteks').textContent = teks && teks !== '-' ? teks : DARURAT_BAWAAN;
+}
+
 async function mulai(pesan) {
   const { data: { session } } = await db.auth.getSession();
   $('viewLogin').classList.toggle('hidden', !!session);
@@ -282,11 +300,14 @@ async function mulai(pesan) {
   $('tbDaftar').textContent = th ? '📋 Tamu Saya' : '📋 Daftar Tamu';
   tab(th ? 'daftar' : 'catat');
 
+  tampilDarurat('');
   // Nama lingkungan di header (opsional, dari tabel pengaturan)
   try {
     const { data: set } = await db.from('pengaturan').select('kunci,nilai');
     const n = (set || []).find(x => x.kunci === 'nama_lingkungan');
     $('judul').textContent = n && n.nilai ? 'Lapor Tamu · ' + n.nilai : 'Lapor Tamu RT 1x24 Jam';
+    const d = (set || []).find(x => x.kunci === 'catatan_darurat');
+    tampilDarurat(d && d.nilai ? d.nilai.trim() : '');
   } catch (e) { /* tabel belum ada: abaikan */ }
 
   const { data, error } = await db.from('warga').select('*').eq('aktif', true).order('nama');
