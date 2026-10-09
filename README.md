@@ -29,7 +29,8 @@ Proyek ini mencoba menjawabnya dengan alur sederhana:
 | **Pemantauan** | Status Menunggu, Terkonfirmasi, Ditolak, Selesai, penanda **Lewat 24 jam**, pencarian, filter status dan tanggal |
 | **Keamanan** | NIK tersamarkan di semua tampilan, akses per peran, NIK lengkap hanya untuk pengurus dan selalu tercatat di log audit |
 | **Privasi** | Penghapusan otomatis NIK, nomor identitas, dan No. HP setelah tamu selesai lebih dari 90 hari (dapat diatur) |
-| **Pengalaman pakai** | Tampilan mobile-first, mode gelap otomatis, dapat dipasang di layar utama HP (PWA sederhana) |
+| **Darurat** | Teks berjalan berisi nomor darurat (112, 110, 113, 118/119, 115, 123) yang dapat diketuk untuk menelepon, isinya dapat diganti pengurus lewat tabel pengaturan |
+| **Pengalaman pakai** | Tampilan mobile-first, mode gelap otomatis, dapat ditambahkan ke layar utama HP lewat `manifest.json` |
 
 ## 👥 Peran Pengguna
 
@@ -56,7 +57,8 @@ flowchart LR
 
 | Bagian | Pilihan |
 |---|---|
-| Tampilan | HTML, CSS, JavaScript (satu file, tanpa framework) |
+| Tampilan | HTML, CSS, dan JavaScript murni, semuanya ditulis di dalam satu berkas `index.html` (tidak ada berkas `.css` atau `.js` terpisah, tanpa framework) |
+| Pustaka eksternal | Hanya `supabase-js` (dimuat dari CDN) untuk terhubung ke database |
 | Database dan login | [Supabase](https://supabase.com) (PostgreSQL, Auth, Row Level Security) |
 | Hosting | [Vercel](https://vercel.com), otomatis deploy dari GitHub |
 | Penjadwalan | `pg_cron` untuk pembersihan data harian |
