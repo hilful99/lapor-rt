@@ -29,7 +29,7 @@ Proyek ini mencoba menjawabnya dengan alur sederhana:
 | **Pemantauan** | Status Menunggu, Terkonfirmasi, Ditolak, Selesai, penanda **Lewat 24 jam**, pencarian, filter status dan tanggal |
 | **Keamanan** | NIK tersamarkan di semua tampilan, akses per peran, NIK lengkap hanya untuk pengurus dan selalu tercatat di log audit |
 | **Privasi** | Penghapusan otomatis NIK, nomor identitas, dan No. HP setelah tamu selesai lebih dari 90 hari (dapat diatur) |
-| **Darurat** | Teks berjalan berisi nomor darurat (112, 110, 113, 118/119, 115, 123) yang dapat diketuk untuk menelepon, isinya dapat diganti pengurus lewat tabel pengaturan |
+| **Darurat** | Tombol darurat di pojok kanan bawah: memilih jenis kejadian (kebakaran, pencurian, medis, lainnya) lalu peringatan merah dengan lampu ambulans muncul di aplikasi semua pengurus dan warga yang sedang terbuka; pengirim tercatat di log audit |
 | **Pengalaman pakai** | Tampilan mobile-first, mode gelap otomatis, dapat ditambahkan ke layar utama HP lewat `manifest.json` |
 
 ## 👥 Peran Pengguna
@@ -77,12 +77,13 @@ Seluruh perubahan data melewati fungsi database (RPC) yang memeriksa peran pengg
 ├── tahap2b.sql           # Tahap 2B: lihat NIK tercatat, log audit, tamu tanpa KTP
 ├── tahap2c.sql           # Tahap 2C: penghapusan data lama
 ├── tahap2c_jadwal.sql    # Jadwal otomatis harian (pg_cron)
+├── tahap3_darurat.sql    # Tahap 3: tombol darurat dan peringatan ke semua pengguna
 └── contoh_7_rumah.sql    # Contoh data warga dan akun tuan rumah (fiktif)
 ```
 
 ## 🚀 Cara Menjalankan
 
-1. **Buat project Supabase.** Di **SQL Editor**, jalankan berurutan: `schema.sql`, `perbaikan.sql`, `tahap2a.sql`, `tahap2b.sql`, `tahap2c.sql`, lalu `tahap2c_jadwal.sql` (terpisah).
+1. **Buat project Supabase.** Di **SQL Editor**, jalankan berurutan: `schema.sql`, `perbaikan.sql`, `tahap2a.sql`, `tahap2b.sql`, `tahap2c.sql`, `tahap3_darurat.sql`, lalu `tahap2c_jadwal.sql` (terpisah).
 2. **Ubah pengaturan** di tabel `pengaturan`: `kode_rt` (misal `RT09`) dan `nama_lingkungan`.
 3. **Matikan pendaftaran bebas** di Authentication agar orang luar tidak bisa membuat akun.
 4. **Buat akun** di Authentication > Users dengan email `ID@petugas.rt` (centang Auto Confirm), lalu beri peran:
@@ -112,7 +113,7 @@ Prinsip yang dipakai: **kumpulkan seperlunya, tampilkan seminimal mungkin, hapus
 - Akun memakai email bayangan `@petugas.rt`, sehingga **lupa password harus direset manual** oleh admin.
 - Tamu tanpa identitas tidak punya NIK untuk dicocokkan, sehingga bisa tercatat ganda.
 - Penambahan warga dan akun masih lewat SQL Editor dan dashboard Supabase.
-- Belum ada notifikasi otomatis ke tuan rumah.
+- Peringatan darurat hanya muncul di aplikasi yang sedang terbuka (diperiksa tiap 15 detik), belum berupa notifikasi HP saat aplikasi tertutup.
 - Belum ada pengujian otomatis di dalam repositori.
 
 ## 🗺️ Rencana Pengembangan
