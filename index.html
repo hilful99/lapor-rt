@@ -113,6 +113,17 @@ button.abu{background:#5b6b82}
 .darurat.aktif .dtag{background:#fff;color:#c62828}
 .darurat.aktif .dteks{color:#fff;font-weight:700}
 @media(prefers-reduced-motion:reduce){.sos{animation:none}.lampuBesar::before,.lampuBesar::after{animation:none;left:0}.lampuBesar::after{display:none}}
+
+.darurat .dtop .ghost{margin:0 0 0 auto;background:#00000040;color:#fff;font-size:13px;padding:5px 12px}
+.dua{display:grid;grid-template-columns:250px 1fr;gap:14px;align-items:start}
+.dua .card{margin:0}
+@media(max-width:640px){.dua{grid-template-columns:1fr}}
+#wList{max-height:62vh;overflow-y:auto;margin-top:10px}
+.wi{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:0 0 6px;padding:10px 12px;background:var(--inp);color:var(--tx);border:2px solid var(--line);text-align:left;font-weight:600;font-size:16px}
+.wi.pilih{border-color:var(--pri)}
+.wi small{color:var(--mut);font-weight:400}
+.wriw{border-top:1px solid var(--line);padding:8px 0;font-size:15px}
+.wriw small{color:var(--mut)}
 </style>
 </head>
 <body>
@@ -135,7 +146,7 @@ button.abu{background:#5b6b82}
 </section>
 
 <section id="viewApp" class="hidden">
-  <div id="darurat" class="darurat" role="note" aria-label="Catatan darurat"><div class="dtop"><span class="dtag">DARURAT</span><span id="dsub">Verifikasi warga</span></div><p class="dteks" id="dteks"></p><div class="dlampu" aria-hidden="true"></div></div>
+  <div id="darurat" class="darurat" role="note" aria-label="Catatan darurat"><div class="dtop"><span class="dtag">DARURAT</span><span id="dsub">Verifikasi warga</span><button id="btnMatikan" class="ghost hidden">Matikan</button></div><p class="dteks" id="dteks"></p><div class="dlampu" aria-hidden="true"></div></div>
 
   <button id="btnSos" class="sos" aria-label="Tombol darurat"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="47" width="44" height="9" rx="3" fill="#6d0f0f"/><path d="M15 47V31a17 17 0 0 1 34 0v16Z" fill="#ff5a4d"/><path d="M15 39h34M15 31h34M24 47V15M32 47V13M40 47V15" stroke="#6d0f0f" stroke-width="1.7" fill="none" opacity=".7"/><ellipse cx="28" cy="27" rx="5" ry="9" fill="#fff" opacity=".4"/></svg><span>DARURAT</span></button>
   <div id="sos" class="sosbg hidden" role="dialog" aria-modal="true"><div class="sosbox">
@@ -197,6 +208,12 @@ button.abu{background:#5b6b82}
     <input id="cari" type="search" placeholder="Cari nama atau nomor dokumen">
     <div id="daftar"></div>
   </div>
+  <div id="tabWarga" class="hidden">
+    <div class="dua">
+      <div class="card"><b>Daftar warga</b><input id="wCari" placeholder="Cari nama atau blok" style="margin-top:8px"><div id="wList"></div></div>
+      <div class="card" id="wDetail"></div>
+    </div>
+  </div>
   <div id="tabLog" class="hidden">
     <h2>Log Aktivitas</h2><div class="card"><b>Penghapusan data lama</b><p class="mut" id="infoRetensi"></p><button id="btnBersih">Bersihkan sekarang</button></div>
     <p class="mut">200 catatan terakhir.</p>
@@ -204,7 +221,7 @@ button.abu{background:#5b6b82}
   </div>
 </section>
 </main>
-<nav id="tabbar" class="hidden"><button id="tbCatat" class="on">📝 Catat Tamu</button><button id="tbDaftar">📋 Daftar Tamu</button><button id="tbLog" class="hidden">🔒 Log</button></nav>
+<nav id="tabbar" class="hidden"><button id="tbCatat" class="on">📝 Catat Tamu</button><button id="tbDaftar">📋 Daftar Tamu</button><button id="tbLog" class="hidden">🔒 Log</button><button id="tbWarga" class="hidden">👥 Warga</button></nav>
 <div id="toast" class="toast hidden"></div>
 
 <script>
@@ -228,8 +245,8 @@ function toast(t, cls) {
   clearTimeout(toast.t); toast.t = setTimeout(() => e.className = 'toast hidden', 3500);
 }
 function tab(n) {
-  $('tabCatat').classList.toggle('hidden', n !== 'catat'); $('tabDaftar').classList.toggle('hidden', n !== 'daftar'); $('tabLog').classList.toggle('hidden', n !== 'log');
-  $('tbCatat').classList.toggle('on', n === 'catat'); $('tbDaftar').classList.toggle('on', n === 'daftar'); $('tbLog').classList.toggle('on', n === 'log');
+  $('tabCatat').classList.toggle('hidden', n !== 'catat'); $('tabDaftar').classList.toggle('hidden', n !== 'daftar'); $('tabLog').classList.toggle('hidden', n !== 'log'); $('tabWarga').classList.toggle('hidden', n !== 'warga');
+  $('tbCatat').classList.toggle('on', n === 'catat'); $('tbDaftar').classList.toggle('on', n === 'daftar'); $('tbLog').classList.toggle('on', n === 'log'); $('tbWarga').classList.toggle('on', n === 'warga');
   window.scrollTo(0, 0);
 }
 function updNik() {
@@ -332,6 +349,7 @@ function bunyiSirene() {
 function gambarDarurat() {
   const box = $('darurat'), n = daruratAktif.length;
   box.classList.toggle('aktif', n > 0);
+  $('btnMatikan').classList.toggle('hidden', !(n > 0 && profil && profil.peran === 'pengurus'));
   if (!n) { $('dsub').textContent = 'Verifikasi warga'; $('alarm').classList.add('hidden'); tampilDarurat(teksBiasa); return; }
   const a = daruratAktif[0];
   box.classList.remove('hidden');
@@ -350,6 +368,8 @@ function gambarDarurat() {
 }
 async function segarDarurat() {
   if ($('viewApp').classList.contains('hidden')) return;
+  const { data: izin } = await db.rpc('tombol_darurat_saya');
+  $('btnSos').classList.toggle('hidden', izin === false);
   const { data, error } = await db.from('v_darurat_aktif').select('*').order('dibuat_pada', { ascending: false });
   if (error) { await tanganiSesi(error); return; }
   daruratAktif = data || [];
@@ -383,6 +403,60 @@ document.querySelectorAll('#sosJenis button').forEach(b => b.onclick = () => {
 setInterval(segarDarurat, 15000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) segarDarurat(); });
 
+let wTerpilih = '', riwayatDarurat = [];
+function tglDarurat(iso) { return new Date(iso).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+async function muatWarga() {
+  const { data: w, error: e1 } = await db.from('warga').select('*').eq('aktif', true).order('nama');
+  if (e1 && await tanganiSesi(e1)) return;
+  if (w) wargaList = w;
+  const { data: r } = await db.from('v_darurat_riwayat').select('*').order('dibuat_pada', { ascending: false }).limit(200);
+  riwayatDarurat = r || [];
+  gambarWarga();
+}
+function gambarWarga() {
+  const k = $('wCari').value.trim().toLowerCase();
+  const daftar = wargaList.filter(w => !k || (w.nama + ' ' + (w.blok || '')).toLowerCase().includes(k));
+  $('wList').innerHTML = daftar.map(w => {
+    const aktif = riwayatDarurat.some(r => r.warga_id === w.id && r.aktif);
+    return `<button class="wi${w.id === wTerpilih ? ' pilih' : ''}" data-id="${esc(w.id)}"><span>${esc(w.nama)}${w.blok ? ' <small>' + esc(w.blok) + '</small>' : ''}</span><span>${aktif ? '🚨' : ''}${w.tombol_darurat === false ? '⛔' : ''}</span></button>`;
+  }).join('') || '<div class="kosong">Tidak ada warga.</div>';
+  const w = wargaList.find(x => x.id === wTerpilih), el = $('wDetail');
+  if (!w) { el.innerHTML = '<div class="kosong">Pilih nama warga di sebelah kiri.</div>'; return; }
+  const mati = w.tombol_darurat === false;
+  const riw = riwayatDarurat.filter(r => r.warga_id === w.id), akt = riw.find(r => r.aktif);
+  el.innerHTML = `<h2>${esc(w.nama)}</h2><p class="mut">${w.blok ? 'Blok ' + esc(w.blok) : 'Blok belum diisi'}</p>
+    <p>Tombol darurat: <b>${mati ? '⛔ Dimatikan' : '✅ Aktif'}</b></p>
+    ${akt ? `<div class="msg err"><b>🚨 ${esc(akt.jenis)}</b> sedang aktif sejak ${esc(tglDarurat(akt.dibuat_pada))}<button data-act="akhiri" data-id="${esc(akt.id)}" class="merah">Matikan peringatan ini</button></div>` : ''}
+    <button data-act="atur" class="${mati ? '' : 'abu'}">${mati ? 'Hidupkan tombol darurat' : 'Matikan tombol darurat warga ini'}</button>
+    <h3>Riwayat darurat (${riw.length})</h3>
+    ${riw.slice(0, 10).map(r => `<div class="wriw"><b>${esc(r.jenis)}</b> <small>${esc(tglDarurat(r.dibuat_pada))} · ${r.selesai_pada ? 'selesai' : (r.aktif ? 'aktif' : 'kedaluwarsa')}</small>${r.keterangan ? '<br>' + esc(r.keterangan) : ''}</div>`).join('') || '<div class="kosong">Belum pernah menekan tombol darurat.</div>'}`;
+}
+async function aksiWarga(e) {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const w = wargaList.find(x => x.id === wTerpilih); if (!w) return;
+  let error;
+  if (b.dataset.act === 'akhiri') {
+    if (!confirm('Matikan peringatan darurat dari ' + w.nama + ' untuk semua orang?')) return;
+    ({ error } = await db.rpc('akhiri_darurat', { p_id: b.dataset.id }));
+  } else {
+    const hidup = w.tombol_darurat === false;
+    if (!confirm((hidup ? 'Hidupkan kembali' : 'Matikan') + ' tombol darurat untuk ' + w.nama + '?')) return;
+    ({ error } = await db.rpc('atur_tombol_darurat', { p_warga: w.id, p_aktif: hidup }));
+  }
+  if (error) { if (await tanganiSesi(error)) return; return toast('Gagal: ' + pesanError(error), 'err'); }
+  toast('Tersimpan', 'ok'); await muatWarga(); segarDarurat();
+}
+async function matikanSemua() {
+  if (!confirm('Matikan SEMUA peringatan darurat yang aktif untuk semua orang?')) return;
+  const { error } = await db.rpc('akhiri_semua_darurat');
+  if (error) { if (await tanganiSesi(error)) return; return toast('Gagal: ' + pesanError(error), 'err'); }
+  toast('Peringatan darurat dimatikan', 'ok'); await segarDarurat();
+}
+$('wCari').addEventListener('input', gambarWarga);
+$('wList').onclick = e => { const b = e.target.closest('.wi'); if (b) { wTerpilih = b.dataset.id; gambarWarga(); } };
+$('wDetail').onclick = aksiWarga;
+$('btnMatikan').onclick = matikanSemua;
+
 const DARURAT_BAWAAN = 'Ada kejadian darurat? Verifikasi ke warga terdekat, lalu hubungi Ketua RT atau Satpam.';
 function tampilDarurat(teks) {
   teksBiasa = teks; if (daruratAktif.length) return;
@@ -410,6 +484,7 @@ async function mulai(pesan) {
   $('idPetugas').textContent = LBL[prof.peran] + ': ' + (session.user.email || '').split('@')[0];
   $('tbCatat').classList.toggle('hidden', th);
   $('tbLog').classList.toggle('hidden', prof.peran !== 'pengurus');
+  $('tbWarga').classList.toggle('hidden', prof.peran !== 'pengurus');
   $('tbDaftar').textContent = th ? '📋 Tamu Saya' : '📋 Daftar Tamu';
   tab(th ? 'daftar' : 'catat');
 
@@ -540,7 +615,7 @@ async function lihatNik(id) {
   alert('NIK: ' + data);
 }
 
-const AKSI = { darurat_kirim: 'Tombol darurat ditekan', darurat_selesai: 'Darurat diakhiri', catat_tamu: 'Mencatat tamu', tandai_keluar: 'Tandai keluar', konfirmasi_ya: 'Tuan rumah: ya, tamu saya', konfirmasi_tolak: 'Tuan rumah: bukan tamu saya', konfirmasi_telepon: 'Konfirmasi via telepon', lihat_nik: 'Membuka NIK lengkap', bersihkan_data: 'Pembersihan data lama' };
+const AKSI = { darurat_atur: 'Tombol darurat warga diatur', darurat_kirim: 'Tombol darurat ditekan', darurat_selesai: 'Darurat diakhiri', catat_tamu: 'Mencatat tamu', tandai_keluar: 'Tandai keluar', konfirmasi_ya: 'Tuan rumah: ya, tamu saya', konfirmasi_tolak: 'Tuan rumah: bukan tamu saya', konfirmasi_telepon: 'Konfirmasi via telepon', lihat_nik: 'Membuka NIK lengkap', bersihkan_data: 'Pembersihan data lama' };
 async function bersihkan() {
   if (!confirm('Hapus data identitas tamu yang sudah melewati batas penyimpanan? Tindakan ini tidak bisa dibatalkan.')) return;
   const { data, error } = await db.rpc('bersihkan_sekarang');
@@ -593,6 +668,7 @@ $('btnNext').onclick = tampilForm;
 $('tbCatat').onclick = () => tab('catat');
 $('tbDaftar').onclick = () => { tab('daftar'); muatDaftar(); };
 $('tbLog').onclick = () => { tab('log'); muatLog(); };
+$('tbWarga').onclick = () => { tab('warga'); muatWarga(); };
 $('jenis').addEventListener('change', ubahJenis);
 $('btnBersih').onclick = bersihkan;
 $('tglDari').addEventListener('change', muatDaftar);

@@ -38,7 +38,7 @@ Proyek ini mencoba menjawabnya dengan alur sederhana:
 |---|---|
 | **Petugas** | Mencatat tamu, mencatat konfirmasi via telepon, menandai tamu keluar |
 | **Tuan rumah** | Melihat hanya tamu yang menuju rumahnya, mengonfirmasi atau menolak |
-| **Pengurus RT** | Melihat semua tamu, membuka NIK lengkap (tercatat), membaca log audit, membersihkan data lama |
+| **Pengurus RT** | Melihat semua tamu, membuka NIK lengkap (tercatat), membaca log audit, membersihkan data lama, mematikan peringatan darurat, melihat daftar warga, serta mematikan atau menghidupkan tombol darurat per warga |
 
 ## 🔄 Alur Kerja
 
@@ -78,12 +78,13 @@ Seluruh perubahan data melewati fungsi database (RPC) yang memeriksa peran pengg
 ├── tahap2c.sql           # Tahap 2C: penghapusan data lama
 ├── tahap2c_jadwal.sql    # Jadwal otomatis harian (pg_cron)
 ├── tahap3_darurat.sql    # Tahap 3: tombol darurat dan peringatan ke semua pengguna
+├── tahap3b_darurat_warga.sql  # Tahap 3B: pengurus mematikan peringatan dan tombol darurat per warga
 └── contoh_7_rumah.sql    # Contoh data warga dan akun tuan rumah (fiktif)
 ```
 
 ## 🚀 Cara Menjalankan
 
-1. **Buat project Supabase.** Di **SQL Editor**, jalankan berurutan: `schema.sql`, `perbaikan.sql`, `tahap2a.sql`, `tahap2b.sql`, `tahap2c.sql`, `tahap3_darurat.sql`, lalu `tahap2c_jadwal.sql` (terpisah).
+1. **Buat project Supabase.** Di **SQL Editor**, jalankan berurutan: `schema.sql`, `perbaikan.sql`, `tahap2a.sql`, `tahap2b.sql`, `tahap2c.sql`, `tahap3_darurat.sql`, `tahap3b_darurat_warga.sql`, lalu `tahap2c_jadwal.sql` (terpisah).
 2. **Ubah pengaturan** di tabel `pengaturan`: `kode_rt` (misal `RT09`) dan `nama_lingkungan`.
 3. **Matikan pendaftaran bebas** di Authentication agar orang luar tidak bisa membuat akun.
 4. **Buat akun** di Authentication > Users dengan email `ID@petugas.rt` (centang Auto Confirm), lalu beri peran:
